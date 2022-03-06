@@ -1,0 +1,7 @@
+
+namespace SnowBrosMod;
+
+class Settings
+{
+    
+}
