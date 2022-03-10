@@ -40,6 +40,18 @@ class SnowBullet : MonoBehaviour
             AttackType = AttackTypes.Acid,
             SpecialType = SpecialTypes.Acid
         });
+        var hm = other.GetComponent<HealthManager>() ?? (other.GetComponentInChildren<HealthManager>() ?? other.GetComponentInParent<HealthManager>());
+        if(hm != null)
+        {
+            var go = hm.gameObject;
+            var sb = go.GetComponent<SnowBall>();
+            if(sb == null)
+            {
+                sb = go.AddComponent<SnowBall>();
+                sb.bindEnemy = go;
+            }
+            sb.NextLevel();
+        }
         if(other.gameObject.layer == (int)PhysLayers.TERRAIN) Destroy(gameObject);
     }
     private void Update() {

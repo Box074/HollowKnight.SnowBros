@@ -12,7 +12,8 @@ class AnimController : MonoBehaviour
         ["Die"] = (0.1f / 4, false),
         ["Walk"] = (0.4f / 12, true),
         ["Atk"] = (0.2f / 8, false),
-        ["Jump"] = (0.05f, false)
+        ["Jump"] = (0.05f, false),
+        ["Kick"] = (0.1f, false)
     };
     public string currentSpr;
     public string currentClip;

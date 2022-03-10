@@ -16,8 +16,8 @@ class SnowBros : ModBaseWithSettings<SnowBros, Settings, object> , IGlobalSettin
             {
                 for(int i = 0; i < 4 ; i++)
                 {
-                    sprites.Add("SnowBall_" + i, Sprite.Create(tex, new Rect(i * 42, 0, 42, 41), 
-                        new Vector2(0.5f, 0.5f), 42));
+                    sprites.Add("SnowBall_" + (i + 1).ToString(), Sprite.Create(tex, new Rect(i * 42, 0, 42, 41), 
+                        new Vector2(0.5f, 0.5f), 42, 0, SpriteMeshType.FullRect));
                 }
             }
         }

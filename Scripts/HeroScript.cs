@@ -4,6 +4,14 @@ namespace SnowBrosMod;
 [AttachHeroController]
 class HeroScript : MonoBehaviour
 {
+    class KickTest : MonoBehaviour
+    {
+        public HeroScript sr;
+        private void OnTriggerEnter2D(Collider2D other) 
+        {
+            sr?.Kick(other.gameObject);
+        }
+    }
     public static HeroScript instance;
     public HeroController hc;
     public ReflectionObject hcr;
@@ -14,12 +22,23 @@ class HeroScript : MonoBehaviour
     public BoxCollider2D col;
     public Rigidbody2D rig;
     public HeroActions ha;
+    public BoxCollider2D kickCol;
     public readonly static Vector2 idleSize = new Vector2(0.5f, 1.2813f);
     private bool lastRun;
     private void OnEnable()
     {
         ResetState();
         isRespawn = false;
+
+        var kickGo = new GameObject("Kick Box");
+        kickGo.transform.parent = transform;
+        kickGo.transform.localPosition = new Vector3(-0.15f, -1.25f, -0.01f);
+        kickCol = kickGo.AddComponent<BoxCollider2D>();
+        kickCol.isTrigger = true;
+        kickCol.size = new Vector2(0.5f, 1.5f);
+        kickCol.enabled = false;
+        var kt = kickGo.AddComponent<KickTest>();
+        kt.sr = this;
 
         ha = InputHandler.Instance.inputActions;
         hc = GetComponent<HeroController>();
@@ -36,11 +55,18 @@ class HeroScript : MonoBehaviour
         hc.RelinquishControl();
 
         On.HeroController.CanTalk += HookCanTalk;
+        On.HeroController.CanFocus += HookCanFocus;
         ModHooks.TakeHealthHook += HookTakeHealth;
 
         renderer.enabled = false;
     }
     private bool HookCanTalk(On.HeroController.orig_CanTalk _, HeroController self)
+    {
+        return self.cState.onGround &&
+            (animCtrl.currentClip == "Idle" || animCtrl.currentClip == "Run"
+                || animCtrl.currentClip == "Walk");
+    }
+    private bool HookCanFocus(On.HeroController.orig_CanFocus _, HeroController self)
     {
         return self.cState.onGround &&
             (animCtrl.currentClip == "Idle" || animCtrl.currentClip == "Run"
@@ -90,6 +116,17 @@ class HeroScript : MonoBehaviour
                             AttackType = AttackTypes.Nail,
                             SpecialType = SpecialTypes.None
                         });
+        var sbe = go.GetComponent<SnowBall.SnowBallEvent>();
+        if(sbe is not null)
+        {
+            if(sbe.snowBall.level >= 4)
+            {
+                sbe.snowBall.kickR = hc.cState.facingRight;
+                sbe.snowBall.rig.velocity = new Vector2(hc.cState.facingRight ? 30 : -30, 0);
+                sbe.snowBall.isKick = true;
+                sbe.snowBall.lastKickTime = Time.time;
+            }
+        }
     }
     public bool CanSit()
     {
@@ -99,7 +136,9 @@ class HeroScript : MonoBehaviour
     {
         if(ha.left.IsPressed) hc.FaceLeft();
         else if(ha.right.IsPressed) hc.FaceRight();
+
         renderer.enabled = false;
+        FSMUtility.SendEventToGameObject(gameObject, "ROAR EXIT");
         if (hc.CanInput())
         {
             hc.StopAnimationControl();
@@ -110,6 +149,8 @@ class HeroScript : MonoBehaviour
         {
             animCtrl.Play("Die", true);
             rig.velocity = new Vector2(0, 15);
+            hc.move_input = 0;
+            hc.vertical_input = 0;
             if (Time.time - respawnTime >= 0.5f)
             {
                 rig.velocity = Vector2.zero;
@@ -128,7 +169,7 @@ class HeroScript : MonoBehaviour
             animCtrl.SetSprite("Run_4");
             return;
         }
-        if (ha.attack.IsPressed && !attacking)
+        if (ha.attack.IsPressed && !attacking && (Time.time - atkColdTime >= 0.35f))
         {
             kicking = true;
             atkColdTime = Time.time;
@@ -136,7 +177,7 @@ class HeroScript : MonoBehaviour
         }
         if (ha.dreamNail.IsPressed && !kicking)
         {
-            if (Time.time - atkColdTime >= 0.15f)
+            if (Time.time - atkColdTime >= 0.35f)
             {
                 attacking = true;
                 atkColdTime = float.MaxValue;
@@ -159,27 +200,11 @@ class HeroScript : MonoBehaviour
             rig.velocity = Vector2.zero;
             if (animCtrl.isPlaying)
             {
-                foreach (var v in Physics2D.BoxCastAll(col.bounds.center, col.bounds.size, 0,
-                    hc.cState.facingRight ? Vector2.right : Vector2.left, 0.35f))
-                {
-                    if(v.transform.root.name == "Knight") continue;
-                    Kick(v.collider.gameObject);
-                }
+                kickCol.enabled = true;
                 return;
             }
+            kickCol.enabled = false;
             if (Time.time - atkColdTime < 0.05f) return;
-            if(Time.time - atkColdTime < 0.15f)
-            {
-                if(hc.cState.onGround)
-                {
-                    animCtrl.Play("Run", true);
-                }
-                else
-                {
-                    animCtrl.Play("Jump", true);
-                }
-                return;
-            }
             kicking = false;
             atkColdTime = Time.time;
         }
@@ -260,6 +285,7 @@ class HeroScript : MonoBehaviour
         renderer.enabled = true;
         On.HeroController.CanTalk -= HookCanTalk;
         ModHooks.TakeHealthHook -= HookTakeHealth;
+        kickCol.enabled = false;
         animCtrl.gameObject.SetActive(false);
         hc.StartAnimationControl();
         hc.RegainControl();
